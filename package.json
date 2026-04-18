@@ -5,8 +5,15 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start":        "node --env-file=.env src/index.js",
+    "dev":          "node --env-file=.env --watch src/index.js",
+    "build:client": "cd client && npm install && npm run build",
+    "build":        "npm run build:client",
+    "setup":        "bash scripts/setup.sh",
+    "seed":         "node --experimental-sqlite scripts/seed.js",
+    "test:load":    "node scripts/test-load.js",
+    "test:errors":  "node scripts/test-errors.js",
+    "test:all":     "node scripts/test-errors.js && node scripts/test-load.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

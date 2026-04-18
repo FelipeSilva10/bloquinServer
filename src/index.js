@@ -8,7 +8,7 @@ import { projectsRouter } from './routes/projects.js';
 import { initWebSocket }  from './services/websocket.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CLIENT_DIR = path.resolve(__dirname, '../client');
+const CLIENT_DIR = path.resolve(__dirname, '../public');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
