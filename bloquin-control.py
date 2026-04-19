@@ -649,7 +649,14 @@ class BloquinControl(Gtk.Window):
             self.big_btn.set_label('■  ENCERRAR AULA')
             ctx.add_class('on')
             ctx.remove_class('off')
-            self._log(f'Tudo pronto! Alunos: http://{HOTSPOT_IP}:{SERVER_PORT}', 'green')
+            
+            # --- ATUALIZA A URL DINAMICAMENTE ---
+            current_ip = self._get_hotspot_ip()
+            url = f'http://{current_ip}:{SERVER_PORT}'
+            self.url_value.set_label(url)
+            self._log(f'Tudo pronto! Alunos: {url}', 'green')
+            # ------------------------------------
+            
             self._set_url_active(True)
         else:
             self.big_btn.set_label('▶  INICIAR AULA')
@@ -700,6 +707,19 @@ class BloquinControl(Gtk.Window):
         subprocess.run(['nmcli', 'connection', 'down', 'Hotspot'], capture_output=True)
         self.hotspot_on = False
         self._log('Hotspot desligado', 'muted')
+
+    def _get_hotspot_ip(self):
+        try:
+            r = subprocess.run(
+                ['ip', '-4', 'addr', 'show', HOTSPOT_IF],
+                capture_output=True, text=True
+            )
+            for line in r.stdout.split('\n'):
+                if 'inet ' in line:
+                    return line.strip().split(' ')[1].split('/')[0]
+        except Exception:
+            pass
+        return HOTSPOT_IP
 
     # ── Servidor ──────────────────────────────────────────────────────────────
 
@@ -758,7 +778,7 @@ class BloquinControl(Gtk.Window):
                 if 'erro' in ll or 'error' in ll:          color = 'red'
                 elif 'compilando' in ll or 'fila' in ll:   color = 'amber'
                 elif 'concluído' in ll or 'rodando' in ll: color = 'green'
-                GLib.idle_add(self._log, f'srv › {line}', color)
+                self._log(f'srv › {line}', color)
 
     # ── Stats ─────────────────────────────────────────────────────────────────
 
@@ -772,7 +792,6 @@ class BloquinControl(Gtk.Window):
         return True
 
     def _fetch_stats(self):
-        # FIX: indentação corrigida — try estava no nível da def (4 espaços), correto é 8
         try:
             req  = urllib.request.Request(
                 f'http://localhost:{SERVER_PORT}/api/admin/local-stats'
@@ -810,7 +829,11 @@ class BloquinControl(Gtk.Window):
 
     def _copy_url(self, btn):
         clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-        clipboard.set_text(f'http://{HOTSPOT_IP}:{SERVER_PORT}', -1)
+        
+        # Copia diretamente da interface (garantindo que pega o IP correto)
+        current_url = self.url_value.get_label()
+        clipboard.set_text(current_url, -1)
+        
         self.copy_btn.set_label('✓ OK')
         GLib.timeout_add(1800, lambda: self.copy_btn.set_label('COPIAR') or False)
 
@@ -842,11 +865,23 @@ class BloquinControl(Gtk.Window):
 
     def _log(self, msg, color='muted'):
         ts  = time.strftime('%H:%M:%S')
-        end = self.log_buf.get_end_iter()
-        self.log_buf.insert_with_tags_by_name(end, f'{ts}  ', 'ts')
-        self.log_buf.insert_with_tags_by_name(end, f'{msg}\n', color)
-        adj = self.log_view.get_vadjustment()
-        GLib.idle_add(adj.set_value, adj.get_upper())
+        
+        def append_text():
+            # 1. Pega o final atual e insere o texto
+            end = self.log_buf.get_end_iter()
+            self.log_buf.insert_with_tags_by_name(end, f'{ts}  ', 'ts')
+            self.log_buf.insert_with_tags_by_name(end, f'{msg}\n', color)
+            
+            # 2. Pega o NOVO final após a inserção
+            new_end = self.log_buf.get_end_iter()
+            
+            # 3. Rolagem segura via marcação interna (evita o crash do Pango)
+            mark = self.log_buf.create_mark(None, new_end, False)
+            self.log_view.scroll_to_mark(mark, 0.0, True, 0.0, 1.0)
+            
+            return False 
+
+        GLib.idle_add(append_text)
 
     def _check_initial_state(self):
         def check():

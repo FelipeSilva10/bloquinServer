@@ -12,7 +12,7 @@
 
 import bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-import { run, all } from '../src/db/index.js';
+import { run, all } from '../server/db/index.js';
 
 const SALT_ROUNDS = 10;
 
