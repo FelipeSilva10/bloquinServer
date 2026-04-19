@@ -24,7 +24,7 @@ from pathlib import Path
 # ── Configuração ──────────────────────────────────────────────────────────────
 
 SERVER_DIR  = str(Path(__file__).resolve().parent)
-SERVER_CMD  = ['/home/felipe/.nvm/versions/node/v24.14.0/bin/node', '--env-file=.env', 'src/index.js']
+SERVER_CMD  = ['/home/felipe/.nvm/versions/node/v24.14.0/bin/node', '--env-file=.env', 'server/index.js']
 SERVER_PORT = 3000
 HOTSPOT_IF  = 'wlp0s20f3'
 HOTSPOT_IP  = '10.42.0.1'
@@ -387,7 +387,6 @@ class BloquinControl(Gtk.Window):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
-        # Scroll externo — conteúdo responsivo verticalmente
         outer_scroll = Gtk.ScrolledWindow()
         outer_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.add(outer_scroll)
@@ -446,7 +445,6 @@ class BloquinControl(Gtk.Window):
         eye1.set_halign(Gtk.Align.START)
         status_section.pack_start(eye1, False, False, 0)
 
-        # Card Hotspot
         self.hotspot_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.hotspot_card.set_name('status-card')
         self.hotspot_dot = Gtk.Box()
@@ -462,7 +460,6 @@ class BloquinControl(Gtk.Window):
         self.hotspot_card.pack_end(self.hotspot_status_lbl, False, False, 0)
         status_section.pack_start(self.hotspot_card, False, False, 0)
 
-        # Card Servidor
         self.server_card = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         self.server_card.set_name('status-card')
         self.server_dot = Gtk.Box()
@@ -775,21 +772,22 @@ class BloquinControl(Gtk.Window):
         return True
 
     def _fetch_stats(self):
-    try:
-        req  = urllib.request.Request(
-            f'http://localhost:{SERVER_PORT}/api/admin/local-stats'
-        )
-        data = json.loads(urllib.request.urlopen(req, timeout=2).read())
+        # FIX: indentação corrigida — try estava no nível da def (4 espaços), correto é 8
+        try:
+            req  = urllib.request.Request(
+                f'http://localhost:{SERVER_PORT}/api/admin/local-stats'
+            )
+            data = json.loads(urllib.request.urlopen(req, timeout=2).read())
 
-        online    = data.get('online', 0)
-        compiling = data.get('compiling', 0)
-        uptime    = int(data.get('uptime', 0))
-        GLib.idle_add(self._update_stats_ui, online, compiling, uptime)
+            online    = data.get('online', 0)
+            compiling = data.get('compiling', 0)
+            uptime    = int(data.get('uptime', 0))
+            GLib.idle_add(self._update_stats_ui, online, compiling, uptime)
 
-    except urllib.error.URLError:
-        pass
-    except Exception:
-        pass
+        except urllib.error.URLError:
+            pass
+        except Exception:
+            pass
 
     def _update_stats_ui(self, online, compiling, uptime):
         self.stat_online[1].set_text(str(online))

@@ -25,10 +25,10 @@ projectsRouter.get('/projects', (req, res) => {
  * Retorna um projeto completo (inclui blocks_xml).
  */
 projectsRouter.get('/projects/:id', (req, res) => {
-const project = get(
-  'SELECT id, name, blocks_xml, target_board, updated_at FROM projects WHERE id = ? AND user_id = ?',
-  [req.params.id, req.user.id]
-);
+  const project = get(
+    'SELECT id, name, blocks_xml, target_board, updated_at FROM projects WHERE id = ? AND user_id = ?',
+    [req.params.id, req.user.id]
+  );
 
   if (!project) {
     return res.status(404).json({ error: 'Projeto não encontrado.' });
@@ -66,7 +66,7 @@ projectsRouter.post('/projects', (req, res) => {
 
 /**
  * PUT /api/projects/:id
- * Body: { name?: string, blocks_xml?: string }
+ * Body: { name?: string, blocks_xml?: string, target_board?: string }
  * Atualiza nome e/ou estado do workspace.
  */
 projectsRouter.put('/projects/:id', (req, res) => {
@@ -79,27 +79,28 @@ projectsRouter.put('/projects/:id', (req, res) => {
     return res.status(404).json({ error: 'Projeto não encontrado.' });
   }
 
-const { name, blocks_xml, target_board } = req.body;
-const now = Math.floor(Date.now() / 1000);
+  const { name, blocks_xml, target_board } = req.body;
+  const now = Math.floor(Date.now() / 1000);
 
-const fields = [];
-const values = [];
+  const fields = [];
+  const values = [];
 
-if (name !== undefined)         { fields.push('name = ?');         values.push(name.trim()); }
-if (blocks_xml !== undefined)   { fields.push('blocks_xml = ?');   values.push(blocks_xml); }
-if (target_board !== undefined) { fields.push('target_board = ?'); values.push(target_board); }
+  if (name !== undefined)         { fields.push('name = ?');         values.push(name.trim()); }
+  if (blocks_xml !== undefined)   { fields.push('blocks_xml = ?');   values.push(blocks_xml); }
+  if (target_board !== undefined) { fields.push('target_board = ?'); values.push(target_board); }
 
-if (fields.length > 0) {
-  fields.push('updated_at = ?');
-  values.push(now, req.params.id);
-  run(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
-}
+  if (fields.length > 0) {
+    fields.push('updated_at = ?');
+    values.push(now, req.params.id);
+    run(`UPDATE projects SET ${fields.join(', ')} WHERE id = ?`, values);
+  }
 
-const project = get(
-  'SELECT id, name, target_board, updated_at FROM projects WHERE id = ?',
-  [req.params.id]
-);
-res.json({ project });
+  const project = get(
+    'SELECT id, name, target_board, updated_at FROM projects WHERE id = ?',
+    [req.params.id]
+  );
+  res.json({ project });
+}); // ← FIX: fechamento do PUT que estava faltando
 
 /**
  * DELETE /api/projects/:id
