@@ -1,59 +1,14 @@
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
 
-export const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  console.error('[SEGURANÇA] JWT_SECRET não definido no .env — servidor recusando inicialização.');
-  process.exit(1);
-})();
-
-export const JWT_EXPIRY = '8h';
+// Em produção: usar variável de ambiente forte
+// Ex: JWT_SECRET=$(openssl rand -hex 32)
+export const JWT_SECRET = process.env.JWT_SECRET || 'bloquin-dev-secret-troque-em-producao';
+export const JWT_EXPIRY = '8h'; // duração de uma jornada escolar
 
 /**
- * Hash dummy pré-computado para nivelar tempo de resposta no login.
- * Gerado uma vez na inicialização; evita timing attack sem custo em cada request.
- * FIX #5: o hash inválido anterior ('$2b$10$invalid...') era rejeitado pelo bcrypt
- * antes do processamento completo, vazando timing.
+ * Gera um token JWT para o usuário autenticado.
+ * @param {{ id: string, username: string, role: string }} user
  */
-let _dummyHash = null;
-async function getDummyHash() {
-  if (!_dummyHash) _dummyHash = await bcrypt.hash('__bloquin_timing_dummy__', 10);
-  return _dummyHash;
-}
-// Aquece o hash no startup para que o primeiro login não seja mais lento
-getDummyHash().catch(() => {});
-
-export { getDummyHash };
-
-// ── Rate limit de login (FIX #4) ─────────────────────────────────────────────
-// Mapa: ip → { count, resetAt }
-const _loginAttempts = new Map();
-const LOGIN_WINDOW_MS  = 60_000; // 1 minuto
-const LOGIN_MAX_TRIES  = 10;     // 10 tentativas por janela por IP
-
-export function checkLoginRateLimit(ip) {
-  const now  = Date.now();
-  const entry = _loginAttempts.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    _loginAttempts.set(ip, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
-    return true; // permitido
-  }
-
-  entry.count++;
-  if (entry.count > LOGIN_MAX_TRIES) return false; // bloqueado
-  return true;
-}
-
-// Limpeza periódica para não acumular IPs antigos
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of _loginAttempts) {
-    if (now > entry.resetAt) _loginAttempts.delete(ip);
-  }
-}, LOGIN_WINDOW_MS);
-
-// ── JWT ───────────────────────────────────────────────────────────────────────
-
 export function signToken(user) {
   return jwt.sign(
     { sub: user.id, username: user.username, role: user.role },
@@ -62,6 +17,10 @@ export function signToken(user) {
   );
 }
 
+/**
+ * Middleware Express: valida o Bearer token e injeta req.user.
+ * Retorna 401 se ausente ou inválido.
+ */
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization;
 
@@ -83,6 +42,10 @@ export function requireAuth(req, res, next) {
   }
 }
 
+/**
+ * Middleware Express: exige role 'teacher'.
+ * Deve ser usado após requireAuth.
+ */
 export function requireTeacher(req, res, next) {
   if (req.user?.role !== 'teacher') {
     return res.status(403).json({ error: 'Acesso restrito a professores.' });

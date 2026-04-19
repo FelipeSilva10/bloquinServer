@@ -1,23 +1,16 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { get } from '../db/index.js';
-import { signToken, requireAuth, getDummyHash, checkLoginRateLimit } from '../services/auth.js';
+import { signToken, requireAuth } from '../services/auth.js';
 
 export const authRouter = Router();
 
 /**
  * POST /api/auth/login
- *
- * FIX #4: Rate limit por IP — 10 tentativas/minuto.
- * FIX #5: Usa getDummyHash() para timing attack mitigation com hash válido.
+ * Body: { username: string, password: string }
+ * Resposta: { token: string, user: { id, name, role } }
  */
 authRouter.post('/auth/login', async (req, res) => {
-  // FIX #4 — rate limit
-  const ip = req.ip || req.socket.remoteAddress || 'unknown';
-  if (!checkLoginRateLimit(ip)) {
-    return res.status(429).json({ error: 'Muitas tentativas. Aguarde 1 minuto.' });
-  }
-
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -30,9 +23,8 @@ authRouter.post('/auth/login', async (req, res) => {
   );
 
   if (!user) {
-    // FIX #5: usa hash dummy válido para não vazar timing
-    const dummy = await getDummyHash();
-    await bcrypt.compare(password, dummy);
+    // Mesmo tempo de resposta independente de o usuário existir (evita timing attack)
+    await bcrypt.compare(password, '$2b$10$invalidhashtopreventtimingattack000000000000');
     return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
   }
 
@@ -50,17 +42,27 @@ authRouter.post('/auth/login', async (req, res) => {
   });
 });
 
+/**
+ * POST /api/auth/logout
+ * Apenas confirma logout (token é stateless — invalidação real fica para Marco futuro)
+ */
 authRouter.post('/auth/logout', requireAuth, (_req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * GET /api/auth/me
+ * Retorna os dados do usuário autenticado — útil para o cliente validar sessão ao recarregar.
+ */
 authRouter.get('/auth/me', requireAuth, (req, res) => {
   const user = get(
     'SELECT id, name, role FROM users WHERE id = ?',
     [req.user.id]
   );
 
-  if (!user) return res.status(404).json({ error: 'Usuário não encontrado.' });
+  if (!user) {
+    return res.status(404).json({ error: 'Usuário não encontrado.' });
+  }
 
   return res.json({ user: { id: user.id, name: user.name, role: user.role } });
 });

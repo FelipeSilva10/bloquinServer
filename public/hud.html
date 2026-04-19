@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Bloquin — Painel do Servidor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:      #0b0f14;
+    --bg2:     #111720;
+    --bg3:     #192030;
+    --border:  #1e2d40;
+    --green:   #00e676;
+    --green2:  #00c853;
+    --amber:   #ffab00;
+    --red:     #ff5252;
+    --blue:    #40c4ff;
+    --muted:   #4a6380;
+    --text:    #cdd9e5;
+    --text2:   #8ba3bd;
+    --mono:    'IBM Plex Mono', monospace;
+    --sans:    'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 0%, #0d2137 0%, transparent 70%),
+      var(--bg);
+  }
+
+  .login-box {
+    width: 360px;
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--green);
+    background: var(--bg2);
+    padding: 40px 36px;
+    border-radius: 4px;
+  }
+
+  .login-box h1 {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--green);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .login-box p {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-bottom: 32px;
+  }
+
+  .field { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .field label { font-size:0.72rem; color:var(--muted); font-family:var(--mono); letter-spacing:0.08em; text-transform:uppercase; }
+  .field input {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    padding: 10px 12px;
+    border-radius: 3px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--green); }
+
+  #login-error {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--red);
+    margin-bottom: 12px;
+    min-height: 18px;
+  }
+
+  .btn-login {
+    width: 100%;
+    background: var(--green);
+    color: #000;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    border: none;
+    padding: 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-login:hover { background: var(--green2); }
+  .btn-login:disabled { opacity:.5; cursor:not-allowed; }
+
+  /* ── HUD ── */
+  #hud { display:none; flex-direction:column; min-height:100vh; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+
+  .header-left { display:flex; align-items:center; gap:16px; }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--green);
+    letter-spacing: 0.12em;
+  }
+
+  .uptime {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .header-right { display:flex; align-items:center; gap:12px; }
+
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.5; transform:scale(.8); }
+  }
+
+  .server-status {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--green);
+    letter-spacing: 0.08em;
+  }
+
+  .btn-logout {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    background: none;
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-logout:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── STATS ROW ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat {
+    background: var(--bg2);
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 1.8rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .stat-value.green  { color: var(--green); }
+  .stat-value.amber  { color: var(--amber); }
+  .stat-value.blue   { color: var(--blue); }
+  .stat-value.red    { color: var(--red); }
+
+  /* ── MAIN GRID ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* ── ALUNOS ── */
+  .panel {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .panel-count {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--green);
+  }
+
+  .panel-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 16px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    align-content: start;
+  }
+
+  /* ── STUDENT CARD ── */
+  .student-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color .2s;
+    cursor: pointer;
+  }
+
+  .student-card:hover { border-color: var(--blue); }
+  .student-card.online { border-left: 3px solid var(--green); }
+  .student-card.offline { border-left: 3px solid var(--border); opacity: .65; }
+  .student-card.compiling { border-left: 3px solid var(--amber); }
+
+  .card-head {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .avatar.online    { background:#00e67620; color:var(--green); }
+  .avatar.offline   { background:#1e2d40; color:var(--muted); }
+  .avatar.compiling { background:#ffab0020; color:var(--amber); }
+
+  .card-info { flex:1; min-width:0; }
+  .card-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .card-username {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .card-badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+  }
+  .badge-online    { background:#00e67615; color:var(--green); }
+  .badge-offline   { background:#1e2d40; color:var(--muted); }
+  .badge-compiling { background:#ffab0015; color:var(--amber); animation: blink 1s ease-in-out infinite; }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* Projetos dentro do card */
+  .card-projects {
+    border-top: 1px solid var(--border);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .3s ease;
+  }
+  .card-projects.open { max-height: 300px; overflow-y: auto; }
+
+  .project-item {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .project-item:last-child { border-bottom: none; }
+
+  .project-name {
+    font-size: 0.82rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+
+  .project-date {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .no-projects {
+    padding: 14px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    text-align: center;
+  }
+
+  /* ── PAINEL DIREITO: FILA + LOG ── */
+  .side-panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Fila */
+  .queue-panel {
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .queue-body { padding: 12px 16px; max-height: 280px; overflow-y: auto; }
+
+  .queue-empty {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .queue-job {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg3);
+  }
+
+  .job-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-compiling { background:var(--amber); box-shadow:0 0 6px var(--amber); animation:pulse 1s infinite; }
+  .dot-pending   { background:var(--muted); }
+
+  .job-info { flex:1; min-width:0; }
+  .job-user {
+    font-size: 0.8rem;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .job-status {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .job-time {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* Log */
+  .log-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+  .log-body {
+    flex:1;
+    overflow-y: auto;
+    padding: 10px 16px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+  }
+
+  .log-entry { display:flex; gap:8px; }
+  .log-time  { color:var(--muted); flex-shrink:0; }
+  .log-msg   { color:var(--text2); }
+  .log-msg.green { color:var(--green); }
+  .log-msg.amber { color:var(--amber); }
+  .log-msg.red   { color:var(--red); }
+  .log-msg.blue  { color:var(--blue); }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar { width:4px; height:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  ::-webkit-scrollbar-thumb:hover { background:var(--muted); }
+
+  /* Refresh indicator */
+  .refresh-bar {
+    height: 2px;
+    background: var(--border);
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+  }
+  .refresh-fill {
+    height: 100%;
+    background: var(--green);
+    width: 0%;
+    transition: width linear;
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>BLOQUIN // HUD</h1>
+    <p>painel do servidor — acesso restrito</p>
+    <div class="field">
+      <label>Usuário</label>
+      <input id="l-user" type="text" placeholder="prof" autocomplete="username"/>
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <div id="login-error"></div>
+    <button class="btn-login" id="l-btn">ENTRAR</button>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <header>
+    <div class="header-left">
+      <span class="logo">BLOQUIN</span>
+      <span class="uptime" id="uptime-display">UP 0s</span>
+    </div>
+    <div class="header-right">
+      <div class="pulse"></div>
+      <span class="server-status">SERVIDOR ATIVO</span>
+      <button class="btn-logout" id="btn-logout">SAIR</button>
+    </div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat">
+      <span class="stat-label">Alunos Online</span>
+      <span class="stat-value green" id="stat-online">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Total de Alunos</span>
+      <span class="stat-value blue" id="stat-total">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Compilando</span>
+      <span class="stat-value amber" id="stat-compiling">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Na Fila</span>
+      <span class="stat-value" id="stat-queue" style="color:var(--text2)">0</span>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- ALUNOS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Alunos</span>
+        <span class="panel-count" id="panel-count">0 online</span>
+      </div>
+      <div class="panel-body" id="students-grid">
+        <!-- cards injetados via JS -->
+      </div>
+    </div>
+
+    <!-- DIREITO -->
+    <div class="side-panel">
+      <!-- Fila de compilação -->
+      <div class="queue-panel">
+        <div class="panel-header" style="border-right:none">
+          <span class="panel-title">Fila de Compilação</span>
+          <span class="panel-count" id="queue-count">vazia</span>
+        </div>
+        <div class="queue-body" id="queue-body">
+          <div class="queue-empty">Nenhuma compilação ativa</div>
+        </div>
+      </div>
+
+      <!-- Log de eventos -->
+      <div class="log-panel">
+        <div class="panel-header" style="border-right:none">
+          <span class="panel-title">Log de Eventos</span>
+          <span class="panel-count" id="log-count">0</span>
+        </div>
+        <div class="log-body" id="log-body">
+          <!-- linhas injetadas via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="refresh-bar"><div class="refresh-fill" id="refresh-fill"></div></div>
+</div>
+
+<script>
+  const BASE    = '';
+  const INTERVAL = 3000; // ms entre refreshes
+  let token     = null;
+  let projects  = {};    // userId → [projetos]
+  let expanded  = {};    // userId → bool
+  let userMap   = {};    // userId → name
+  let logLines  = [];
+  let logCount  = 0;
+
+  // ── Login ──────────────────────────────────────────────────────────────────
+
+  async function doLogin() {
+    const btn   = document.getElementById('l-btn');
+    const errEl = document.getElementById('login-error');
+    const user  = document.getElementById('l-user').value.trim();
+    const pass  = document.getElementById('l-pass').value;
+    errEl.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'AUTENTICANDO...';
+
+    try {
+      const res  = await fetch(`${BASE}/api/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username: user, password: pass }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha no login.');
+      if (data.user?.role !== 'teacher') throw new Error('Acesso restrito a professores.');
+      token = data.token;
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('hud').style.display = 'flex';
+      addLog('Autenticado como ' + data.user.name, 'green');
+      startHUD();
+    } catch (e) {
+      errEl.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'ENTRAR';
+    }
+  }
+
+  document.getElementById('l-btn').addEventListener('click', doLogin);
+  document.getElementById('l-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    token = null;
+    location.reload();
+  });
+
+  // ── HUD ────────────────────────────────────────────────────────────────────
+
+  function api(path) {
+    return fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+  }
+
+  async function loadProjects(userId) {
+    try {
+      const data = await api(`/api/admin/projects/${userId}`);
+      projects[userId] = data.projects || [];
+      renderStudents(lastUsers);
+    } catch { /* */ }
+  }
+
+  let lastUsers = [];
+  let prevOnline = new Set();
+
+  async function refresh() {
+    try {
+      const [statsData, usersData] = await Promise.all([
+        api('/api/admin/stats'),
+        api('/api/admin/users'),
+      ]);
+
+      // Stats
+      const online     = usersData.users.filter(u => u.role === 'student' && u.online);
+      const students   = usersData.users.filter(u => u.role === 'student');
+      const compiling  = usersData.users.filter(u => u.compiling === 'compiling');
+
+      document.getElementById('stat-online').textContent    = online.length;
+      document.getElementById('stat-total').textContent     = students.length;
+      document.getElementById('stat-compiling').textContent = compiling.length;
+      document.getElementById('stat-queue').textContent     = statsData.queue.waiting;
+      document.getElementById('panel-count').textContent    = `${online.length} online`;
+
+      // Uptime
+      const s = Math.floor(statsData.uptime);
+      const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+      document.getElementById('uptime-display').textContent =
+        h ? `UP ${h}h ${m}m` : m ? `UP ${m}m ${sec}s` : `UP ${sec}s`;
+
+      // Log de mudanças de status
+      usersData.users.filter(u => u.role === 'student').forEach(u => {
+        userMap[u.id] = u.name;
+        if (u.online && !prevOnline.has(u.id))  addLog(`${u.name} conectou`, 'green');
+        if (!u.online && prevOnline.has(u.id))  addLog(`${u.name} desconectou`, 'amber');
+        if (u.compiling === 'compiling')         addLog(`${u.name} compilando...`, 'blue');
+      });
+      prevOnline = new Set(usersData.users.filter(u => u.online).map(u => u.id));
+
+      // Renderizar alunos
+      lastUsers = usersData.users;
+      renderStudents(usersData.users);
+
+      // Fila
+      renderQueue(statsData.queue.jobs, usersData.users);
+
+    } catch (e) {
+      addLog('Erro ao buscar dados: ' + e.message, 'red');
+    }
+  }
+
+  function renderStudents(users) {
+    const grid     = document.getElementById('students-grid');
+    const students = users.filter(u => u.role === 'student');
+
+    // Ordenar: online primeiro, depois offline
+    students.sort((a, b) => {
+      if (a.online !== b.online) return a.online ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    grid.innerHTML = '';
+    students.forEach(u => {
+      const status = u.compiling === 'compiling' ? 'compiling' : u.online ? 'online' : 'offline';
+      const badge  = { online:'ONLINE', offline:'OFFLINE', compiling:'COMPILANDO' }[status];
+      const bClass = { online:'badge-online', offline:'badge-offline', compiling:'badge-compiling' }[status];
+      const initials = u.name.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+      const projs  = projects[u.id];
+      const isOpen = expanded[u.id];
+
+      const card = document.createElement('div');
+      card.className = `student-card ${status}`;
+      card.innerHTML = `
+        <div class="card-head">
+          <div class="avatar ${status}">${initials}</div>
+          <div class="card-info">
+            <div class="card-name">${u.name}</div>
+            <div class="card-username">@${u.username}</div>
+          </div>
+          <span class="card-badge ${bClass}">${badge}</span>
+        </div>
+        <div class="card-projects ${isOpen ? 'open' : ''}" id="proj-${u.id}">
+          ${renderProjects(u.id)}
+        </div>
+      `;
+
+      // Toggle projetos
+      card.querySelector('.card-head').addEventListener('click', () => {
+        expanded[u.id] = !expanded[u.id];
+        if (expanded[u.id] && !projects[u.id]) {
+          loadProjects(u.id);
+        } else {
+          const el = document.getElementById(`proj-${u.id}`);
+          if (el) el.classList.toggle('open', expanded[u.id]);
+        }
+      });
+
+      grid.appendChild(card);
+    });
+  }
+
+  function renderProjects(userId) {
+    const projs = projects[userId];
+    if (!projs) return `<div class="no-projects">clique para carregar projetos</div>`;
+    if (!projs.length) return `<div class="no-projects">nenhum projeto</div>`;
+    return projs.map(p => {
+      const d = new Date(p.updated_at * 1000);
+      const date = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' });
+      return `
+        <div class="project-item">
+          <span class="project-name">📄 ${escHtml(p.name)}</span>
+          <span class="project-date">${date}</span>
+        </div>`;
+    }).join('');
+  }
+
+  function renderQueue(jobs, users) {
+    const body  = document.getElementById('queue-body');
+    const count = document.getElementById('queue-count');
+
+    if (!jobs || !jobs.length) {
+      body.innerHTML  = `<div class="queue-empty">Nenhuma compilação ativa</div>`;
+      count.textContent = 'vazia';
+      return;
+    }
+
+    count.textContent = `${jobs.length} job${jobs.length > 1 ? 's' : ''}`;
+
+    body.innerHTML = jobs.map(j => {
+      const userName = userMap[j.clientId] || j.clientId.slice(0,8);
+      const isComp   = j.status === 'compiling';
+      const elapsed  = Math.floor((Date.now() - j.createdAt) / 1000);
+      return `
+        <div class="queue-job">
+          <div class="job-dot ${isComp ? 'dot-compiling' : 'dot-pending'}"></div>
+          <div class="job-info">
+            <div class="job-user">${escHtml(userName)}</div>
+            <div class="job-status">${isComp ? 'compilando' : `fila #${j.position}`}</div>
+          </div>
+          <span class="job-time">${elapsed}s</span>
+        </div>`;
+    }).join('');
+  }
+
+  function addLog(msg, cls = '') {
+    const now   = new Date();
+    const time  = now.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    logLines.push({ time, msg, cls });
+    if (logLines.length > 80) logLines.shift();
+    logCount++;
+    document.getElementById('log-count').textContent = logCount;
+
+    const body = document.getElementById('log-body');
+    const div  = document.createElement('div');
+    div.className = 'log-entry';
+    div.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${cls}">${escHtml(msg)}</span>`;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Loop principal ─────────────────────────────────────────────────────────
+
+  function startHUD() {
+    refresh();
+    addLog('HUD iniciado', 'green');
+
+    // Barra de progresso do refresh
+    let fill = 0;
+    const bar = document.getElementById('refresh-fill');
+    const tick = setInterval(() => {
+      fill = (fill + 100 / (INTERVAL / 100)) % 101;
+      bar.style.width = fill + '%';
+    }, 100);
+
+    // Refresh periódico
+    setInterval(() => { refresh(); fill = 0; }, INTERVAL);
+  }
+</script>
+</body>
+</html>
