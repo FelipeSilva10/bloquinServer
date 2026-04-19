@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { blqAuth, getStoredUser } from '../services/api';
-// Logo: copiar de assets/ do desktop ou referenciar pelo caminho público
-// import logoCompleta from '../assets/LogoCompleta.png';
+import logoCompleta from '../../assets/LogoCompleta.png';
 
 interface LoginScreenProps {
   onLogin: (role: 'student' | 'teacher' | 'visitor') => void;
@@ -16,7 +15,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) { setError('Por favor, preencha email e senha.'); return; }
+    if (!email || !password) { setError('Por favor, preencha usuário e senha.'); return; }
 
     setLoading(true);
     setError('');
@@ -27,7 +26,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     });
 
     if (authError || !data?.user) {
-      setError('Email ou senha incorretos.');
+      setError('Usuário ou senha incorretos.');
       setLoading(false);
       return;
     }
@@ -46,16 +45,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
   return (
     <div className="login-container">
       <div className="login-card">
-        {/* <img src={logoCompleta} alt="bloquin" style={{ height: '50px', marginBottom: '24px' }} /> */}
-        <h2 style={{ marginBottom: '8px', fontWeight: 900, color: 'var(--dark)' }}>Bloquin</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '24px', fontWeight: 700 }}>
-          Programação visual para ESP32
-        </p>
-
+        <img src={logoCompleta} alt="bloquin" style={{ height: '70px', marginBottom: '20px' }} />
         <form className="login-form" onSubmit={handleLogin}>
           <input
             type="text"
-            placeholder="Usuário ou email"
+            placeholder="Usuário"
             value={email}
             onChange={e => setEmail(e.target.value)}
             disabled={loading}

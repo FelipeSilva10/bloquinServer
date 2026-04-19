@@ -15,10 +15,33 @@ import LZString from 'lz-string';
 import { BoardKey, BOARD_UNSET, BOARDS } from '../blockly/blocks';
 import { BLOCK_NAMES, toolboxConfig }    from '../blockly/toolbox';
 
-// Logo: referenciar asset copiado
-// import logoSimples from '../assets/LogoSimples.png';
-
 Blockly.setLocale(PtBr as unknown as Record<string, string>);
+
+const bloquinTheme = Blockly.Theme.defineTheme('bloquinTheme', {
+  name: 'bloquinTheme', base: Blockly.Themes.Classic,
+  blockStyles: {
+    colour_blocks:   { colourPrimary: '#ef9f4b', colourSecondary: '#d4891f', colourTertiary: '#b87219' },
+    list_blocks:     { colourPrimary: '#4cd137', colourSecondary: '#3bac29', colourTertiary: '#2e8a1f' },
+    logic_blocks:    { colourPrimary: '#6c5ce7', colourSecondary: '#5a4ed4', colourTertiary: '#473dbf' },
+    loop_blocks:     { colourPrimary: '#00b894', colourSecondary: '#00a381', colourTertiary: '#008068' },
+    math_blocks:     { colourPrimary: '#0984e3', colourSecondary: '#0773c9', colourTertiary: '#0562af' },
+    procedure_blocks:{ colourPrimary: '#fd79a8', colourSecondary: '#e46d96', colourTertiary: '#cc6284' },
+    text_blocks:     { colourPrimary: '#fdcb6e', colourSecondary: '#e4b55b', colourTertiary: '#cb9e48' },
+    variable_blocks: { colourPrimary: '#e17055', colourSecondary: '#c85f42', colourTertiary: '#b04e30' },
+    variable_dynamic_blocks: { colourPrimary: '#e17055', colourSecondary: '#c85f42', colourTertiary: '#b04e30' },
+    hat_blocks:      { colourPrimary: '#a29bfe', colourSecondary: '#9085e3', colourTertiary: '#7e71c8' },
+  },
+  componentStyles: {
+    workspaceBackgroundColour: '#eef2f7',
+    toolboxBackgroundColour:   '#1a2035',
+    toolboxForegroundColour:   '#ffffff',
+    flyoutBackgroundColour:    '#242c42',
+    flyoutForegroundColour:    '#ffffff',
+    flyoutOpacity:             0.98,
+    scrollbarColour:           '#00a8ff',
+    scrollbarOpacity:          0.5,
+  },
+});
 
 function BoardBadge({ boardKey }: { boardKey: BoardKey }) {
   const colorMap: Record<BoardKey, string> = { uno: '#0984e3', nano: '#ff00d0', esp32: '#e17055' };
@@ -71,33 +94,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
   const isUploadingRef = useRef(false);
   const [friendlyError, setFriendlyError]   = useState<FriendlyError | null>(null);
   const [showFlashModal, setShowFlashModal] = useState(false);
-
-  // ── Tema Blockly (idêntico ao desktop) ──────────────────────────────────
-  const bloquinTheme = Blockly.Theme.defineTheme('bloquinTheme', {
-    name: 'bloquinTheme', base: Blockly.Themes.Classic,
-    blockStyles: {
-      colour_blocks:   { colourPrimary: '#ef9f4b', colourSecondary: '#d4891f', colourTertiary: '#b87219' },
-      list_blocks:     { colourPrimary: '#4cd137', colourSecondary: '#3bac29', colourTertiary: '#2e8a1f' },
-      logic_blocks:    { colourPrimary: '#6c5ce7', colourSecondary: '#5a4ed4', colourTertiary: '#473dbf' },
-      loop_blocks:     { colourPrimary: '#00b894', colourSecondary: '#00a381', colourTertiary: '#008068' },
-      math_blocks:     { colourPrimary: '#0984e3', colourSecondary: '#0773c9', colourTertiary: '#0562af' },
-      procedure_blocks:{ colourPrimary: '#fd79a8', colourSecondary: '#e46d96', colourTertiary: '#cc6284' },
-      text_blocks:     { colourPrimary: '#fdcb6e', colourSecondary: '#e4b55b', colourTertiary: '#cb9e48' },
-      variable_blocks: { colourPrimary: '#e17055', colourSecondary: '#c85f42', colourTertiary: '#b04e30' },
-      variable_dynamic_blocks: { colourPrimary: '#e17055', colourSecondary: '#c85f42', colourTertiary: '#b04e30' },
-      hat_blocks:      { colourPrimary: '#a29bfe', colourSecondary: '#9085e3', colourTertiary: '#7e71c8' },
-    },
-    componentStyles: {
-      workspaceBackgroundColour: '#eef2f7',
-      toolboxBackgroundColour:   '#1a2035',
-      toolboxForegroundColour:   '#ffffff',
-      flyoutBackgroundColour:    '#242c42',
-      flyoutForegroundColour:    '#ffffff',
-      flyoutOpacity:             0.98,
-      scrollbarColour:           '#00a8ff',
-      scrollbarOpacity:          0.5,
-    },
-  });
+  const [lastJobId, setLastJobId] = useState<string>('');
 
   // ── Portas ────────────────────────────────────────────────────────────────
   const fetchPorts = async () => {
@@ -125,7 +122,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     codeGeneratorRef.current = generateCode;
   };
 
-  // ── Carregar dados do projeto ─────────────────────────────────────────────
+  // ── Carregar projeto ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
@@ -140,9 +137,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
 
       const raw = data.target_board as string | null | undefined;
 
-      // MVP web: apenas ESP32. Se não tiver placa definida, define automaticamente.
       if (!raw || raw === BOARD_UNSET) {
-        // Auto-seleccionar ESP32 sem mostrar o modal
         const { syncBoardPins } = await import('../blockly/blocks');
         syncBoardPins('esp32');
         setBoard('esp32');
@@ -198,7 +193,6 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
   // ── Inicializar Blockly ───────────────────────────────────────────────────
   useEffect(() => {
     if (boardLoadState !== 'ready' || !blocklyDiv.current || workspace.current) return;
-
     workspace.current = Blockly.inject(blocklyDiv.current, {
       toolbox: toolboxConfig,
       grid: { spacing: 24, length: 4, colour: '#d8e0ec', snap: true },
@@ -233,16 +227,12 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     const savedData = pendingWorkspaceData.current;
     if (savedData && typeof savedData === 'string' && savedData.trim() !== '') {
       try {
-        // Tenta descomprimir LZ (formato desktop) — se falhar trata como XML puro
         const decompressed = LZString.decompressFromBase64(savedData);
         const raw = decompressed ? JSON.parse(decompressed) : JSON.parse(savedData);
         if (raw && Object.keys(raw).length > 0) {
           Blockly.serialization.workspaces.load(raw, workspace.current);
-        } else {
-          ensureRootBlocks();
-        }
+        } else { ensureRootBlocks(); }
       } catch {
-        // Pode ser XML direto (formato web)
         try {
           const xml = Blockly.utils.xml.textToDom(savedData as string);
           Blockly.Xml.domToWorkspace(xml, workspace.current);
@@ -262,9 +252,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     };
   }, [boardLoadState]);
 
-  useEffect(() => {
-    fetchPorts();
-  }, []);
+  useEffect(() => { fetchPorts(); }, []);
 
   useEffect(() => {
     if (workspace.current) Blockly.svgResize(workspace.current);
@@ -293,18 +281,14 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
   const handleSaveProject = async () => {
     if (!projectId || !workspace.current || !board) return;
     setIsSaving(true);
-
-    // Web: salvar como XML Blockly (sem compressão LZ — mais simples de debugar)
     const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace.current));
-
     const { error } = await ProjectService.saveProject(projectId, board, xml);
     setIsSaving(false);
     if (!error) { setSaveStatus('success'); setIsDirty(false); }
     else {
       setFriendlyError({
         emoji: '☁️', title: 'Não consegui salvar!',
-        message: String(error),
-        tip: 'Verifique a conexão com o servidor.',
+        message: String(error), tip: 'Verifique a conexão com o servidor.',
         rawError: String(error),
       });
     }
@@ -334,8 +318,14 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     if (!isUploadingRef.current) return;
 
     setUploadStage('compiling');
-    await HardwareService.uploadCode(generatedCode, board, port);
-    // O resultado chega via listenUploadResult — que seta 'sending' / 'success' / error
+
+    try {
+      const jobId = await HardwareService.uploadCode(generatedCode, board, port);
+      setLastJobId(jobId);
+    } catch {
+   
+    }
+
     await delay(1000);
     if (!isUploadingRef.current) return;
     setUploadStage('sending');
@@ -359,11 +349,8 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
       {/* TOPBAR */}
       <div className="topbar">
         <div className="topbar-left">
-          {/* <img src={logoSimples} alt="bloquin" style={{ height: '34px' }} /> */}
           <span style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--primary)' }}>Bloquin</span>
-          {projectName && (
-            <span className="project-title-badge">{projectName}</span>
-          )}
+          {projectName && <span className="project-title-badge">{projectName}</span>}
         </div>
 
         <div className="topbar-center">
@@ -435,7 +422,6 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
         </div>
       )}
 
-      {/* WORKSPACE */}
       <div className="workspace-area">
         <div ref={blocklyDiv} id="blocklyDiv" />
         {isCodeVisible && (
@@ -457,7 +443,6 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
           stage={uploadStage}
           onClose={() => {
             if (uploadStage === 'success') {
-              // Ao clicar "Gravar no ESP32" no modal de sucesso
               setUploadStage(null);
               setShowFlashModal(true);
             } else {
@@ -467,15 +452,12 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
         />
       )}
 
-      {showFlashModal && (() => {
-        const jobId = sessionStorage.getItem('blq_last_job') ?? '';
-        return (
-          <FlashModal
-            jobId={jobId}
-            onClose={() => setShowFlashModal(false)}
-          />
-        );
-      })()}
+      {showFlashModal && (
+        <FlashModal
+          jobId={lastJobId}
+          onClose={() => setShowFlashModal(false)}
+        />
+      )}
 
       {orphanWarning.length > 0 && (
         <OrphanModal

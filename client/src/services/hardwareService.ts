@@ -1,12 +1,9 @@
 /**
- * hardwareService.ts — Marco 5 completo
+ * hardwareService.ts
  *
- * Substitui as chamadas Tauri (invoke/listen) pelas equivalentes web:
- *   invoke('upload_code')        → POST /api/compile  +  eventos WS
- *   invoke('start_serial')       → Web Serial (serialService.startMonitor)
- *   invoke('stop_serial')        → Web Serial (serialService.stopMonitor)
- *   listen('upload-result')      → CustomEvent 'blq:upload-result'
- *   listen('serial-message')     → CustomEvent 'blq:serial-message'
+ * FIX #8: uploadCode agora retorna Promise<string> com o jobId,
+ * eliminando a dependência de sessionStorage.getItem('blq_last_job')
+ * no FlashModal (que causava jobId stale após compilações consecutivas).
  */
 
 import { getToken } from './api';
@@ -17,9 +14,6 @@ export type UnlistenFn = () => void;
 
 export const HardwareService = {
 
-  // ── Portas ────────────────────────────────────────────────────────────────
-  // Web Serial não lista portas antes de gesto do usuário.
-  // Retorna placeholder informativo para manter o dropdown funcional.
   async getAvailablePorts(): Promise<string[]> {
     if (!('serial' in navigator)) {
       return ['(Web Serial indisponível neste navegador)'];
@@ -27,8 +21,13 @@ export const HardwareService = {
     return ['(ESP32 — clique Compilar, depois Gravar)'];
   },
 
-  // ── Compilação ────────────────────────────────────────────────────────────
-  async uploadCode(codigo: string, _placa: string, _porta: string): Promise<void> {
+  /**
+   * FIX #8: retorna o jobId em vez de armazená-lo no sessionStorage.
+   * O chamador (IdeScreen) mantém o jobId em estado React e passa ao FlashModal.
+   *
+   * @returns Promise<string> jobId da compilação enfileirada
+   */
+  async uploadCode(codigo: string, _placa: string, _porta: string): Promise<string> {
     const token = getToken();
 
     const res = await fetch('/api/compile', {
@@ -43,15 +42,12 @@ export const HardwareService = {
     if (!res.ok) {
       const { error } = await res.json().catch(() => ({ error: 'Erro desconhecido' })) as { error: string };
       window.dispatchEvent(new CustomEvent('blq:upload-result', { detail: `err:${error}` }));
-      return;
+      throw new Error(error);
     }
 
     const { jobId } = await res.json() as { jobId: string; position: number };
 
-    // Guarda para uso posterior no FlashModal
-    sessionStorage.setItem('blq_last_job', jobId);
-
-    // Registra handler para eventos WS deste job
+    // FIX #8: jobId retornado — não salvar mais em sessionStorage
     blqWs.onJob(jobId, (event: WsEvent) => {
       switch (event.type) {
         case 'done':
@@ -72,9 +68,10 @@ export const HardwareService = {
           break;
       }
     });
+
+    return jobId;
   },
 
-  // ── Serial Monitor ────────────────────────────────────────────────────────
   async startSerial(_porta: string): Promise<void> {
     if (!('serial' in navigator)) {
       throw new Error('Web Serial API não disponível. Use Chrome 89+ ou Edge 89+.');
@@ -88,7 +85,6 @@ export const HardwareService = {
     await stopMonitor();
   },
 
-  // ── Listeners (compatibilidade com IdeScreen) ─────────────────────────────
   async listenUploadResult(callback: (payload: string) => void): Promise<UnlistenFn> {
     const handler = (e: Event) => callback((e as CustomEvent<string>).detail);
     window.addEventListener('blq:upload-result', handler);

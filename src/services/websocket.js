@@ -4,43 +4,87 @@ import { JWT_SECRET } from './auth.js';
 
 /**
  * Mapa de conexões ativas.
- * Chave: userId (extraído do JWT)  →  Valor: instância WebSocket
+ * Chave: userId → WebSocket
+ *
+ * FIX #7: antes de registrar nova conexão, a anterior era silenciosamente
+ * sobrescrita. Agora é fechada explicitamente com código 4001.
  */
 const connections = new Map();
+
+/** Timeout para receber mensagem de autenticação após conectar (ms) */
+const AUTH_TIMEOUT_MS = 5_000;
 
 export function initWebSocket(httpServer) {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-  wss.on('connection', (ws, req) => {
-    const params = new URLSearchParams(req.url.replace('/ws?', ''));
-    const token  = params.get('token');
+  wss.on('connection', (ws, _req) => {
+    /**
+     * FIX #3: token NÃO vem mais na query string (URL logada por proxies/access logs).
+     * O cliente deve enviar como primeira mensagem JSON:
+     *   { type: 'auth', token: '<JWT>' }
+     *
+     * Se a mensagem não chegar em AUTH_TIMEOUT_MS, a conexão é encerrada.
+     */
+    let userId = null;
+    let authenticated = false;
 
-    // Valida o JWT — recusa conexão sem token válido
-    let userId;
-    try {
-      const payload = jwt.verify(token, JWT_SECRET);
-      userId = payload.sub;
-    } catch {
-      ws.close(1008, 'Token inválido ou ausente.');
-      return;
-    }
+    const authTimeout = setTimeout(() => {
+      if (!authenticated) {
+        ws.close(4000, 'Timeout de autenticação.');
+      }
+    }, AUTH_TIMEOUT_MS);
 
-    connections.set(userId, ws);
-    console.log(`[WS] Conectado: ${userId}`);
+    ws.on('message', (data) => {
+      // Fase de autenticação — processa apenas a mensagem inicial
+      if (!authenticated) {
+        try {
+          const msg = JSON.parse(data.toString());
+
+          if (msg.type !== 'auth' || !msg.token) {
+            ws.close(4001, 'Primeira mensagem deve ser { type: "auth", token }.');
+            return;
+          }
+
+          const payload = jwt.verify(msg.token, JWT_SECRET);
+          userId = payload.sub;
+          authenticated = true;
+          clearTimeout(authTimeout);
+
+          // FIX #7: fechar conexão anterior do mesmo usuário antes de registrar
+          const existing = connections.get(userId);
+          if (existing && existing.readyState === WebSocket.OPEN) {
+            existing.close(4001, 'Nova sessão iniciada em outra aba.');
+            console.log(`[WS] Conexão anterior de ${userId} encerrada (nova aba).`);
+          }
+
+          connections.set(userId, ws);
+          console.log(`[WS] Autenticado: ${userId}`);
+
+          // Confirma autenticação
+          ws.send(JSON.stringify({ type: 'connected', userId }));
+        } catch (err) {
+          clearTimeout(authTimeout);
+          ws.close(4002, 'Token inválido.');
+        }
+        return;
+      }
+
+      // Mensagens pós-autenticação (extensível — por ora ignoradas)
+    });
 
     ws.on('close', () => {
-      if (connections.get(userId) === ws) connections.delete(userId);
-      console.log(`[WS] Desconectado: ${userId}`);
+      if (userId && connections.get(userId) === ws) {
+        connections.delete(userId);
+        console.log(`[WS] Desconectado: ${userId}`);
+      }
     });
 
     ws.on('error', (err) => {
-      console.error(`[WS] Erro (${userId}):`, err.message);
+      console.error(`[WS] Erro (${userId ?? 'não autenticado'}):`, err.message);
     });
-
-    send(userId, { type: 'connected', userId });
   });
 
-  console.log('[WS] WebSocketServer inicializado em /ws');
+  console.log('[WS] WebSocketServer inicializado em /ws (auth via primeira mensagem)');
   return wss;
 }
 

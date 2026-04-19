@@ -44,3 +44,13 @@ interface Serial extends EventTarget {
 interface Navigator {
   readonly serial: Serial;
 }
+
+declare module '*.png' {
+  const src: string;
+  export default src;
+}
+
+declare module '*.jpg' {
+  const src: string;
+  export default src;
+}

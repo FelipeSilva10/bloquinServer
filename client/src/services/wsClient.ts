@@ -1,7 +1,14 @@
 /**
  * services/wsClient.ts
- * Cliente WebSocket autenticado com reconexão automática.
- * Substitui os listeners Tauri (listen('upload-result'), etc.)
+ *
+ * FIX #3: token JWT enviado como primeira mensagem WebSocket, não mais na
+ * query string da URL (que aparece em logs de acesso de servidores e proxies).
+ *
+ * Protocolo de handshake:
+ *   1. Cliente abre ws://host/ws  (sem token na URL)
+ *   2. Assim que 'open' dispara, envia: { type: 'auth', token: '<JWT>' }
+ *   3. Servidor responde: { type: 'connected', userId }
+ *   4. A partir daí, eventos normais de job fluem normalmente.
  */
 
 import { getToken } from './api';
@@ -10,19 +17,19 @@ type WsHandler = (event: WsEvent) => void;
 
 export interface WsEvent {
   type: 'connected' | 'queued' | 'compiling' | 'done' | 'error';
-  jobId?: string;
+  jobId?:    string;
   position?: number;
-  message?: string;
-  stderr?: string;
+  message?:  string;
+  stderr?:   string;
 }
 
 class BloquinWsClient {
-  private ws: WebSocket | null = null;
-  private handlers = new Map<string, WsHandler>();  // jobId → handler
+  private ws:             WebSocket | null = null;
+  private handlers =      new Map<string, WsHandler>();
   private reconnectDelay = 1000;
-  private maxDelay = 16_000;
-  private active = false;
-  private currentJobId: string | null = null;
+  private maxDelay =       16_000;
+  private active =         false;
+  private currentJobId:   string | null = null;
 
   connect() {
     this.active = true;
@@ -39,34 +46,48 @@ class BloquinWsClient {
     const token = getToken();
     if (!token || !this.active) return;
 
+    // FIX #3: URL sem token — apenas o path base
     const wsBase = window.location.origin.replace(/^http/, 'ws');
-    this.ws = new WebSocket(`${wsBase}/ws?token=${encodeURIComponent(token)}`);
+    this.ws = new WebSocket(`${wsBase}/ws`);
 
     this.ws.addEventListener('open', () => {
-      console.log('[WS] Conectado');
+      console.log('[WS] Conectado — enviando auth');
       this.reconnectDelay = 1000;
-      // Resync se havia job em andamento
-      if (this.currentJobId) this._syncJob(this.currentJobId);
+
+      // FIX #3: token enviado como primeira mensagem, não na URL
+      this.ws!.send(JSON.stringify({ type: 'auth', token }));
     });
 
     this.ws.addEventListener('message', ({ data }) => {
       try {
-        const event: WsEvent = JSON.parse(data);
+        const event: WsEvent & { type: string } = JSON.parse(data);
+
+        if (event.type === 'connected') {
+          console.log('[WS] Autenticado');
+          // Resync se havia job em andamento quando reconectou
+          if (this.currentJobId) this._syncJob(this.currentJobId);
+          return;
+        }
+
         if (event.jobId) {
-          this.handlers.get(event.jobId)?.(event);
+          this.handlers.get(event.jobId)?.(event as WsEvent);
         }
       } catch { /* ignorar */ }
     });
 
-    this.ws.addEventListener('close', () => {
+    this.ws.addEventListener('close', (e) => {
       if (!this.active) return;
+      // Código 4001 = servidor fechou por nova sessão em outra aba — não reconectar
+      if (e.code === 4001) {
+        console.warn('[WS] Sessão substituída por nova aba — reconexão cancelada.');
+        return;
+      }
       console.log(`[WS] Reconectando em ${this.reconnectDelay}ms`);
       setTimeout(() => this._open(), this.reconnectDelay);
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxDelay);
     });
   }
 
-  /** Registra callback para eventos de um job específico */
   onJob(jobId: string, handler: WsHandler) {
     this.currentJobId = jobId;
     this.handlers.set(jobId, handler);
@@ -77,7 +98,6 @@ class BloquinWsClient {
     if (this.currentJobId === jobId) this.currentJobId = null;
   }
 
-  /** Polling de status após reconexão WS */
   private async _syncJob(jobId: string) {
     try {
       const token = getToken();
