@@ -1,4 +1,4 @@
-import{G as $,N as u}from"./index-PHZ9hWCn.js";const o=new $("CPP");function v(){o.scrub_=function(e,l,a){const t=e.nextConnection&&e.nextConnection.targetBlock(),n=a?"":o.blockToCode(t);return l+n},o.forBlock.bloco_setup=e=>`void setup() {
+import{G as $,N as u}from"./index-xiPzbkuK.js";const o=new $("CPP");function v(){o.scrub_=function(e,l,a){const t=e.nextConnection&&e.nextConnection.targetBlock(),n=a?"":o.blockToCode(t);return l+n},o.forBlock.bloco_setup=e=>`void setup() {
   Serial.begin(115200);
 ${o.statementToCode(e,"DO")||`  // setup...
 `}}

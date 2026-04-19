@@ -11,6 +11,7 @@ import { SerialMonitor, SerialMessage } from '../components/modals/SerialMonitor
 import { ErrorModal, FriendlyError, getFriendlyError } from '../components/modals/ErrorModal';
 import { FlashModal }      from '../components/modals/FlashModal';
 import LZString from 'lz-string';
+import logoSimples from '../../assets/LogoSimples.png';
 
 import { BoardKey, BOARD_UNSET, BOARDS } from '../blockly/blocks';
 import { BLOCK_NAMES, toolboxConfig }    from '../blockly/toolbox';
@@ -349,7 +350,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
       {/* TOPBAR */}
       <div className="topbar">
         <div className="topbar-left">
-          <span style={{ fontWeight: 900, fontSize: '1.2rem', color: 'var(--primary)' }}>Bloquin</span>
+          <img src={logoSimples} alt="bloquin" style={{ height: '34px' }} />
           {projectName && <span className="project-title-badge">{projectName}</span>}
         </div>
 
