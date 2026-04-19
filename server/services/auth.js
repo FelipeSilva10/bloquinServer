@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 // Em produção: usar variável de ambiente forte
 // Ex: JWT_SECRET=$(openssl rand -hex 32)
-export const JWT_SECRET = process.env.JWT_SECRET || 'bloquin-dev-secret-troque-em-producao';
+export const JWT_SECRET = process.env.JWT_SECRET;
 export const JWT_EXPIRY = '8h'; // duração de uma jornada escolar
 
 /**

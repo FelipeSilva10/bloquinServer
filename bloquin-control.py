@@ -30,9 +30,6 @@ HOTSPOT_IF  = 'wlp0s20f3'
 HOTSPOT_IP  = '10.42.0.1'
 REFRESH_MS  = 3000
 
-ADMIN_USER = 'prof'
-ADMIN_PASS = 'prof123'
-
 # ── CSS (GTK3-safe: sem box-shadow, sem linear-gradient, sem transition) ──────
 
 CSS = """
@@ -371,7 +368,6 @@ class BloquinControl(Gtk.Window):
         self.server_proc = None
         self.hotspot_on  = False
         self.server_on   = False
-        self.token       = None
         self.starting    = False
         self.stopping    = False
 
@@ -745,7 +741,6 @@ class BloquinControl(Gtk.Window):
                 except Exception: pass
             self.server_proc = None
         self.server_on = False
-        self.token = None
         self._log('Servidor encerrado', 'muted')
 
     def _server_alive(self):
@@ -780,41 +775,21 @@ class BloquinControl(Gtk.Window):
         return True
 
     def _fetch_stats(self):
-        try:
-            if not self.token:
-                data = json.dumps({'username': ADMIN_USER, 'password': ADMIN_PASS}).encode()
-                req  = urllib.request.Request(
-                    f'http://localhost:{SERVER_PORT}/api/auth/login',
-                    data=data, headers={'Content-Type': 'application/json'}
-                )
-                resp = urllib.request.urlopen(req, timeout=2)
-                body = json.loads(resp.read())
-                if body.get('user', {}).get('role') == 'teacher':
-                    self.token = body['token']
-                else:
-                    return
+    try:
+        req  = urllib.request.Request(
+            f'http://localhost:{SERVER_PORT}/api/admin/local-stats'
+        )
+        data = json.loads(urllib.request.urlopen(req, timeout=2).read())
 
-            req = urllib.request.Request(
-                f'http://localhost:{SERVER_PORT}/api/admin/stats',
-                headers={'Authorization': f'Bearer {self.token}'}
-            )
-            stats = json.loads(urllib.request.urlopen(req, timeout=2).read())
+        online    = data.get('online', 0)
+        compiling = data.get('compiling', 0)
+        uptime    = int(data.get('uptime', 0))
+        GLib.idle_add(self._update_stats_ui, online, compiling, uptime)
 
-            req2 = urllib.request.Request(
-                f'http://localhost:{SERVER_PORT}/api/admin/users',
-                headers={'Authorization': f'Bearer {self.token}'}
-            )
-            users = json.loads(urllib.request.urlopen(req2, timeout=2).read())
-
-            online    = sum(1 for u in users.get('users', []) if u['role'] == 'student' and u['online'])
-            compiling = sum(1 for u in users.get('users', []) if u.get('compiling') == 'compiling')
-            uptime    = int(stats.get('uptime', 0))
-            GLib.idle_add(self._update_stats_ui, online, compiling, uptime)
-
-        except urllib.error.URLError:
-            self.token = None
-        except Exception:
-            pass
+    except urllib.error.URLError:
+        pass
+    except Exception:
+        pass
 
     def _update_stats_ui(self, online, compiling, uptime):
         self.stat_online[1].set_text(str(online))

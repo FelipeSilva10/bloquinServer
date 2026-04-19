@@ -8,6 +8,12 @@ import { projectsRouter } from './routes/projects.js';
 import { adminRouter }    from './routes/admin.js';
 import { initWebSocket }  from './services/websocket.js';
 
+// Validação de variáveis de ambiente obrigatórias
+if (!process.env.JWT_SECRET) {
+  console.error('[ERRO] JWT_SECRET não definido. Copie .env.example para .env e configure.');
+  process.exit(1);
+}
+
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_DIR = path.resolve(__dirname, '../public');
 

@@ -147,26 +147,24 @@ export const blqProjects = {
     return { data: projects, error: null };
   },
 
-  async get(id: string) {
-    const { data, error } = await request<{
-      project: { id: string; name: string; blocks_xml: string; updated_at: number }
-    }>('GET', `/api/projects/${id}`);
+ async get(id: string) {
+  const { data, error } = await request<{
+    project: { id: string; name: string; blocks_xml: string; target_board: string; updated_at: number }
+  }>('GET', `/api/projects/${id}`);
 
-    if (error || !data) return { data: null, error };
+  if (error || !data) return { data: null, error };
 
-    return {
-      data: {
-        id: data.project.id,
-        nome: data.project.name,
-        // O desktop usa workspace_data (LZ-compressed XML); aqui guardamos XML direto
-        // A IdeScreen adaptada vai lidar com ambos os formatos
-        workspace_data: data.project.blocks_xml,
-        target_board: 'esp32',  // MVP: apenas ESP32
-        updated_at: new Date(data.project.updated_at * 1000).toISOString(),
-      },
-      error: null,
-    };
-  },
+  return {
+    data: {
+      id:             data.project.id,
+      nome:           data.project.name,
+      workspace_data: data.project.blocks_xml,
+      target_board:   data.project.target_board,  // ← valor real do banco
+      updated_at:     new Date(data.project.updated_at * 1000).toISOString(),
+    },
+    error: null,
+  };
+},
 
   async create(nome: string) {
     const { data, error } = await request<{ project: { id: string; name: string; updated_at: number } }>(
@@ -179,13 +177,14 @@ export const blqProjects = {
     };
   },
 
-  async save(id: string, payload: { nome?: string; workspace_data?: string; target_board?: string }) {
-    const body: Record<string, string> = {};
-    if (payload.nome)           body.name       = payload.nome;
-    if (payload.workspace_data) body.blocks_xml  = payload.workspace_data;
-    const { error } = await request('PUT', `/api/projects/${id}`, body);
-    return { error };
-  },
+async save(id: string, payload: { nome?: string; workspace_data?: string; target_board?: string }) {
+  const body: Record<string, string> = {};
+  if (payload.nome)           body.name         = payload.nome;
+  if (payload.workspace_data) body.blocks_xml    = payload.workspace_data;
+  if (payload.target_board)   body.target_board  = payload.target_board;  // ← linha que faltava
+  const { error } = await request('PUT', `/api/projects/${id}`, body);
+  return { error };
+},
 
   async delete(id: string) {
     const { error } = await request('DELETE', `/api/projects/${id}`);

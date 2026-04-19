@@ -82,3 +82,28 @@ adminRouter.get('/admin/projects/:userId', (req, res) => {
 
   res.json({ user, projects });
 });
+// Middleware — rejeita qualquer IP fora do localhost
+function requireLocalhost(req, res, next) {
+  const ip = req.ip || req.socket.remoteAddress;
+  const isLocal = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  if (isLocal) return next();
+  return res.status(403).json({ error: 'Acesso restrito ao servidor local.' });
+}
+
+// Rota sem autenticação — só responde para localhost
+adminRouter.get('/admin/local-stats', requireLocalhost, (_req, res) => {
+  const connected = getConnectedUsers();
+  const queue     = getQueueSnapshot();
+  const users     = all('SELECT id, role FROM users');
+
+  const students        = users.filter(u => u.role === 'student');
+  const onlineCount     = students.filter(u => connected.includes(u.id)).length;
+
+  res.json({
+    uptime:    process.uptime(),
+    online:    onlineCount,
+    total:     students.length,
+    compiling: queue.pending,
+    queued:    queue.queued,
+  });
+});
