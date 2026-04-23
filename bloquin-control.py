@@ -32,12 +32,6 @@ HOTSPOT_SSID  = 'Bloquin'
 HOTSPOT_PASS  = 'robotica123'
 REFRESH_MS    = 3000
 
-# ── Paleta ────────────────────────────────────────────────────────────────────
-#
-#  Filosofia: fundo neutro escuro (não azulado), texto branco legível,
-#  verde saturado para ON, vermelho para erro, âmbar para aviso.
-#  Evitar cores apagadas que forçam o usuário a adivinhar o estado.
-
 CSS = """
 * {
     font-family: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -87,18 +81,6 @@ window {
     font-size: 9px;
     letter-spacing: 2px;
     margin-top: 1px;
-}
-
-#version-tag {
-    background-color: #1f1f1f;
-    border-width: 1px;
-    border-style: solid;
-    border-color: #2a2a2a;
-    border-radius: 4px;
-    padding: 3px 8px;
-    color: #555555;
-    font-size: 8px;
-    letter-spacing: 1px;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -198,8 +180,8 @@ window {
 }
 
 #svc-name {
-    color: #cccccc;
-    font-size: 11px;
+    color: #ebe6e6;
+    font-size: 13px;
     font-weight: 700;
 }
 
@@ -499,19 +481,10 @@ class BloquinControl(Gtk.Window):
         name = Gtk.Label(label='BLOQUIN CONTROL')
         name.set_name('app-name')
         name.set_halign(Gtk.Align.START)
-        sub = Gtk.Label(label='SERVIDOR DE AULA · GABARITO')
-        sub.set_name('app-subtitle')
-        sub.set_halign(Gtk.Align.START)
         titles.pack_start(name, False, False, 0)
-        titles.pack_start(sub,  False, False, 0)
         left.pack_start(titles, False, False, 0)
 
-        ver = Gtk.Label(label='v2.0')
-        ver.set_name('version-tag')
-        ver.set_valign(Gtk.Align.CENTER)
-
         hdr.pack_start(left, True, True, 0)
-        hdr.pack_end(ver,   False, False, 0)
         return hdr
 
     # ── Botão principal ───────────────────────────────────────────────────────
