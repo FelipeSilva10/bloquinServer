@@ -4,6 +4,7 @@ import 'blockly/blocks';
 import * as PtBr from 'blockly/msg/pt-br';
 import { ProjectService }  from '../services/projectService';
 import { HardwareService } from '../services/hardwareService';
+import { isWebSerialSupported } from '../services/serialService';
 import { BoardSelectionModal } from '../components/modals/BoardSelectionModal';
 import { UploadModal, UploadStage } from '../components/modals/UploadModal';
 import { OrphanModal }     from '../components/modals/OrphanModal';
@@ -253,6 +254,21 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     };
   }, [boardLoadState]);
 
+  // FIX Blockly visual: ResizeObserver para redimensionar o SVG automaticamente
+  // Corrige o bug onde zoom/lixeira ficam fora de posição ou invisíveis
+  useEffect(() => {
+    if (boardLoadState !== 'ready' || !blocklyDiv.current) return;
+
+    const observer = new ResizeObserver(() => {
+      if (workspace.current) {
+        Blockly.svgResize(workspace.current);
+      }
+    });
+
+    observer.observe(blocklyDiv.current);
+    return () => observer.disconnect();
+  }, [boardLoadState]);
+
   useEffect(() => { fetchPorts(); }, []);
 
   useEffect(() => {
@@ -273,23 +289,47 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
 
   const handleToggleSerial = async () => {
     try {
-      if (isSerialOpen) { await HardwareService.stopSerial(); setIsSerialOpen(false); }
-      else { setSerialMessages([]); await HardwareService.startSerial(port); setIsSerialOpen(true); }
-    } catch (error) { setFriendlyError(getFriendlyError(String(error))); }
+      if (isSerialOpen) {
+        await HardwareService.stopSerial();
+        setIsSerialOpen(false);
+      } else {
+        setSerialMessages([]);
+        await HardwareService.startSerial(port);
+        setIsSerialOpen(true);
+      }
+    } catch (error) {
+      // FIX Chromebook: erro de Web Serial vira ErrorModal legível
+      setFriendlyError(getFriendlyError(String(error)));
+    }
   };
 
   // ── Salvar projeto ────────────────────────────────────────────────────────
   const handleSaveProject = async () => {
     if (!projectId || !workspace.current || !board) return;
     setIsSaving(true);
-    const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace.current));
-    const { error } = await ProjectService.saveProject(projectId, board, xml);
+
+    // FIX: usa serialização JSON moderna do Blockly (mais compacta e robusta que XML)
+    // Fallback para XML se a serialização JSON falhar
+    let workspaceData: string;
+    try {
+      const json = Blockly.serialization.workspaces.save(workspace.current);
+      workspaceData = JSON.stringify(json);
+    } catch {
+      workspaceData = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(workspace.current));
+    }
+
+    const { error } = await ProjectService.saveProject(projectId, board, workspaceData);
     setIsSaving(false);
-    if (!error) { setSaveStatus('success'); setIsDirty(false); }
-    else {
+
+    if (!error) {
+      setSaveStatus('success');
+      setIsDirty(false);
+    } else {
       setFriendlyError({
-        emoji: '☁️', title: 'Não consegui salvar!',
-        message: String(error), tip: 'Verifique a conexão com o servidor.',
+        emoji: '☁️',
+        title: 'Não consegui salvar!',
+        message: String(error),
+        tip: 'Verifique a conexão com o servidor e tente novamente.',
         rawError: String(error),
       });
     }
@@ -312,7 +352,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
       return;
     }
 
-    if (isSerialOpen) { await HardwareService.stopSerial(); }
+    if (isSerialOpen) { await HardwareService.stopSerial(); setIsSerialOpen(false); }
     isUploadingRef.current = true;
     setUploadStage('validating');
     await delay(500);
@@ -324,7 +364,7 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
       const jobId = await HardwareService.uploadCode(generatedCode, board, port);
       setLastJobId(jobId);
     } catch {
-   
+      // erro já despachado via CustomEvent
     }
 
     await delay(1000);
@@ -337,6 +377,11 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
     if (isDirty) setShowExitConfirm(true);
     else onBack();
   };
+
+  // Rótulo do botão de serial — avisa quando Web Serial não está disponível
+  const serialButtonLabel = isSerialOpen
+    ? '🛑 Parar'
+    : (isWebSerialSupported() ? 'Chat' : '📡 Chat (indisponível)');
 
   return (
     <div className="app-container">
@@ -380,8 +425,9 @@ export function IdeScreen({ role, readOnly = false, onBack, projectId }: IdeScre
                 <button
                   className={`btn-action ${isSerialOpen ? 'btn-chat-active' : 'btn-chat'}`}
                   onClick={handleToggleSerial}
+                  title={!isWebSerialSupported() ? 'Web Serial não disponível neste dispositivo' : ''}
                 >
-                  {isSerialOpen ? '🛑 Parar' : 'Chat'}
+                  {serialButtonLabel}
                 </button>
               </>
             )}

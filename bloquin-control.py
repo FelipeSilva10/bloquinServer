@@ -19,6 +19,7 @@ import json
 import urllib.request
 import urllib.error
 import time
+import webbrowser
 from pathlib import Path
 
 # ── Configuração ──────────────────────────────────────────────────────────────
@@ -398,6 +399,47 @@ textview text {
 }
 
 /* ═══════════════════════════════════════════════════
+   ATALHOS
+════════════════════════════════════════════════════ */
+
+#shortcuts-wrap {
+    padding: 0 18px 14px 18px;
+}
+
+#shortcut-btn {
+    background-color: #111820;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #1e3a5f;
+    border-radius: 6px;
+    color: #60a5fa;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+}
+
+#shortcut-btn:hover {
+    background-color: #1e3a5f;
+    border-color: #3b82f6;
+}
+
+#shortcut-btn-off {
+    background-color: #1a1a1a;
+    border-width: 1px;
+    border-style: solid;
+    border-color: #2a2a2a;
+    border-radius: 6px;
+    color: #333333;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 10px 14px;
+}
+
+/* ═══════════════════════════════════════════════════
    SCROLLBAR
 ════════════════════════════════════════════════════ */
 
@@ -455,12 +497,13 @@ class BloquinControl(Gtk.Window):
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         outer_scroll.add(root)
 
-        root.pack_start(self._build_header(),   False, False, 0)
-        root.pack_start(self._build_button(),   False, False, 0)
-        root.pack_start(self._build_services(), False, False, 0)
-        root.pack_start(self._build_url(),      False, False, 0)
-        root.pack_start(self._build_stats(),    False, False, 0)
-        root.pack_start(self._build_log(),      True,  True,  0)
+        root.pack_start(self._build_header(),    False, False, 0)
+        root.pack_start(self._build_button(),    False, False, 0)
+        root.pack_start(self._build_services(),  False, False, 0)
+        root.pack_start(self._build_url(),       False, False, 0)
+        root.pack_start(self._build_shortcuts(), False, False, 0)
+        root.pack_start(self._build_stats(),     False, False, 0)
+        root.pack_start(self._build_log(),       True,  True,  0)
 
         self.show_all()
 
@@ -586,6 +629,48 @@ class BloquinControl(Gtk.Window):
         self.url_card.pack_end(self.copy_btn,  False, False, 0)
         wrap.pack_start(self.url_card, False, False, 0)
         return wrap
+
+    # ── Atalhos ───────────────────────────────────────────────────────────────
+
+    def _build_shortcuts(self):
+        wrap = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        wrap.set_name('shortcuts-wrap')
+
+        lbl = Gtk.Label(label='ATALHOS')
+        lbl.set_name('section-label')
+        lbl.set_halign(Gtk.Align.START)
+        wrap.pack_start(lbl, False, False, 0)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+        self.btn_users = Gtk.Button(label='👤  USUÁRIOS')
+        self.btn_users.set_name('shortcut-btn-off')
+        self.btn_users.set_tooltip_text(f'Abrir http://localhost:{SERVER_PORT}/users.html')
+        self.btn_users.connect('clicked', self._open_users)
+        self.btn_users.set_hexpand(True)
+
+        self.btn_hud = Gtk.Button(label='📊  PAINEL')
+        self.btn_hud.set_name('shortcut-btn-off')
+        self.btn_hud.set_tooltip_text(f'Abrir http://localhost:{SERVER_PORT}/hud.html')
+        self.btn_hud.connect('clicked', self._open_hud)
+        self.btn_hud.set_hexpand(True)
+
+        row.pack_start(self.btn_users, True, True, 0)
+        row.pack_start(self.btn_hud,   True, True, 0)
+        wrap.pack_start(row, False, False, 0)
+        return wrap
+
+    def _open_users(self, _btn):
+        if self.server_on:
+            webbrowser.open(f'http://localhost:{SERVER_PORT}/users.html')
+        else:
+            self._log('Servidor inativo. Inicie a aula primeiro.', 'amber')
+
+    def _open_hud(self, _btn):
+        if self.server_on:
+            webbrowser.open(f'http://localhost:{SERVER_PORT}/hud.html')
+        else:
+            self._log('Servidor inativo. Inicie a aula primeiro.', 'amber')
 
     # ── Stats ────────────────────────────────────────────────────────────────
 
@@ -946,10 +1031,14 @@ class BloquinControl(Gtk.Window):
             self.srv_card.set_name('service-card-on')
             self.srv_badge.set_name('badge-on')
             self.srv_badge.set_label('RODANDO')
+            self.btn_users.set_name('shortcut-btn')
+            self.btn_hud.set_name('shortcut-btn')
         else:
             self.srv_card.set_name('service-card')
             self.srv_badge.set_name('badge-off')
             self.srv_badge.set_label('INATIVO')
+            self.btn_users.set_name('shortcut-btn-off')
+            self.btn_hud.set_name('shortcut-btn-off')
 
     def _set_url_active(self, active):
         if active:

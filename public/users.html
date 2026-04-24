@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloquin · Usuários</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0e0e0e;
+      --bg2:       #161616;
+      --bg3:       #1c1c1c;
+      --border:    #272727;
+      --border2:   #333;
+      --text:      #d4d4d4;
+      --muted:     #555;
+      --green:     #22c55e;
+      --green-dim: #14532d;
+      --green-bg:  #0a1f10;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --red-bg:    #1f0a0a;
+      --blue:      #60a5fa;
+      --font:      'JetBrains Mono', monospace;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* ── layout ── */
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ── topbar ── */
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+    .topbar-sub {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+    .topbar-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .topbar-back {
+      background: transparent;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      padding: 4px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all .15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .topbar-back:hover { border-color: var(--blue); color: var(--blue); }
+    .badge-count {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 1px;
+    }
+    .badge-count span {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    /* ── main ── */
+    .main {
+      padding: 28px 24px;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      align-items: start;
+    }
+
+    /* ── panel ── */
+    .panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* ── filtros ── */
+    .filter-bar {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+    .filter-btn {
+      background: transparent;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      padding: 4px 12px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-btn:hover { border-color: var(--border2); color: var(--text); }
+    .filter-btn.active {
+      background: var(--green-bg);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    /* ── tabela ── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead th {
+      padding: 10px 18px;
+      text-align: left;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--bg3); }
+    tbody tr.editing { background: #0f1a14; }
+    td {
+      padding: 12px 18px;
+      vertical-align: middle;
+    }
+    .td-username { color: #fff; font-weight: 700; }
+    .td-name     { color: var(--text); }
+    .td-date     { color: var(--muted); font-size: 11px; }
+
+    .role-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    .role-student  { background: var(--bg3); border: 1px solid var(--border2); color: var(--muted); }
+    .role-teacher  { background: var(--green-bg); border: 1px solid var(--green); color: var(--green); }
+
+    .online-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    .online-dot.on  { background: var(--green); box-shadow: 0 0 5px var(--green); }
+    .online-dot.off { background: var(--border2); }
+
+    /* ── botões de ação da linha ── */
+    .row-actions { display: flex; gap: 6px; }
+    .btn-icon {
+      background: transparent;
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 10px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-icon:hover { border-color: var(--blue); color: var(--blue); }
+    .btn-icon.danger:hover { border-color: var(--red); color: var(--red); }
+    .btn-icon.confirm { border-color: var(--green); color: var(--green); }
+    .btn-icon.cancel  { border-color: var(--border2); }
+
+    /* ── inline edit ── */
+    .inline-input {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      padding: 4px 8px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .inline-input:focus { border-color: var(--green); }
+    .inline-select {
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 4px 8px;
+      outline: none;
+      cursor: pointer;
+    }
+    .inline-select:focus { border-color: var(--green); }
+
+    /* ── empty state ── */
+    .empty {
+      padding: 48px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 1px;
+    }
+
+    /* ── sidebar: form de criação ── */
+    .form-wrap { display: flex; flex-direction: column; gap: 6px; padding: 18px; }
+    .form-label {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .form-input, .form-select {
+      background: var(--bg3);
+      border: 1px solid var(--border2);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      padding: 8px 10px;
+      width: 100%;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--green); }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+    .btn-primary {
+      background: var(--green-dim);
+      border: 1px solid var(--green);
+      border-radius: 4px;
+      color: var(--green);
+      font-family: var(--font);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 10px;
+      cursor: pointer;
+      width: 100%;
+      text-transform: uppercase;
+      transition: all .15s;
+      margin-top: 6px;
+    }
+    .btn-primary:hover { background: var(--green); color: #000; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── toast ── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+    }
+    .toast {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 10px 16px;
+      font-size: 11px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slide-in .2s ease;
+      box-shadow: 0 4px 24px rgba(0,0,0,.5);
+      min-width: 260px;
+    }
+    .toast.ok   { border-color: var(--green); }
+    .toast.err  { border-color: var(--red);   }
+    .toast .ti  { font-size: 14px; }
+    @keyframes slide-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── loading ── */
+    .loading {
+      padding: 40px;
+      text-align: center;
+      color: var(--muted);
+      letter-spacing: 2px;
+      font-size: 10px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── erro de conexão ── */
+    .conn-error {
+      padding: 20px 18px;
+      background: var(--red-bg);
+      border-bottom: 1px solid var(--red);
+      color: var(--red);
+      font-size: 10px;
+      letter-spacing: 1px;
+      display: none;
+    }
+    .conn-error.visible { display: block; }
+
+    @media (max-width: 860px) {
+      .main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- topbar -->
+  <header class="topbar">
+    <div class="topbar-dot"></div>
+    <div>
+      <div class="topbar-title">Bloquin · Usuários</div>
+    </div>
+    <div class="topbar-sub">Gerenciamento local — acesso restrito ao servidor</div>
+    <div class="topbar-right">
+      <div class="badge-count" id="count-badge">
+        <span id="count-num">—</span> usuários
+      </div>
+      <div class="badge-count" id="online-badge">
+        <span id="online-num" style="color:var(--green)">—</span> online
+      </div>
+      <a class="topbar-back" href="/hud.html">← PAINEL</a>
+    </div>
+  </header>
+
+  <!-- main -->
+  <div class="main">
+
+    <!-- tabela de usuários -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Lista de usuários</span>
+        <button class="btn-icon" onclick="loadUsers()" title="Recarregar">↺ atualizar</button>
+      </div>
+
+      <!-- filtro por role -->
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all"     onclick="setFilter('all',this)">TODOS</button>
+        <button class="filter-btn"        data-filter="student" onclick="setFilter('student',this)">ALUNOS</button>
+        <button class="filter-btn"        data-filter="teacher" onclick="setFilter('teacher',this)">PROFESSORES</button>
+        <button class="filter-btn"        data-filter="online"  onclick="setFilter('online',this)">ONLINE</button>
+      </div>
+
+      <div class="conn-error" id="conn-error">
+        ⚠ Não foi possível conectar ao servidor. Certifique-se de acessar de localhost.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Usuário</th>
+              <th>Nome</th>
+              <th>Role</th>
+              <th>Criado em</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <tr><td colspan="6" class="loading"><span class="spinner"></span>Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- sidebar: criar usuário -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Novo usuário</span>
+      </div>
+      <div class="form-wrap">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input class="form-input" id="f-username" type="text"
+                 placeholder="aluno01" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nome completo</label>
+          <input class="form-input" id="f-name" type="text"
+                 placeholder="Aluno 01" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input class="form-input" id="f-password" type="text"
+                 placeholder="mínimo 4 caracteres" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="f-role">
+            <option value="student">Aluno</option>
+            <option value="teacher">Professor</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="create-btn" onclick="createUser()">
+          + CRIAR USUÁRIO
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div>
+
+<!-- toasts -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+  const API = '/api/admin/local';
+  let allUsers   = [];
+  let activeFilter = 'all';
+  let editingId    = null;
+
+  // ── fetch helpers ────────────────────────────────────────────────────────────
+
+  async function apiFetch(path, opts = {}) {
+    const res = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  // ── carregar usuários ─────────────────────────────────────────────────────────
+
+  async function loadUsers() {
+    document.getElementById('conn-error').classList.remove('visible');
+    try {
+      const data = await apiFetch('/users');
+      allUsers = data.users;
+      updateCounters();
+      renderTable();
+    } catch (e) {
+      document.getElementById('conn-error').classList.add('visible');
+      document.getElementById('users-tbody').innerHTML =
+        `<tr><td colspan="6" class="empty">Falha ao carregar usuários.</td></tr>`;
+    }
+  }
+
+  function updateCounters() {
+    document.getElementById('count-num').textContent = allUsers.length;
+    document.getElementById('online-num').textContent = allUsers.filter(u => u.online).length;
+  }
+
+  // ── filtros ──────────────────────────────────────────────────────────────────
+
+  function setFilter(f, btn) {
+    activeFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+  }
+
+  function filteredUsers() {
+    if (activeFilter === 'all')     return allUsers;
+    if (activeFilter === 'online')  return allUsers.filter(u => u.online);
+    return allUsers.filter(u => u.role === activeFilter);
+  }
+
+  // ── renderizar tabela ────────────────────────────────────────────────────────
+
+  function renderTable() {
+    const users = filteredUsers();
+    const tbody = document.getElementById('users-tbody');
+
+    if (users.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="empty">Nenhum usuário encontrado.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = users.map(u => {
+      if (editingId === u.id) return rowEdit(u);
+      return rowNormal(u);
+    }).join('');
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '—';
+    const d = new Date(ts * 1000);
+    return d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit' });
+  }
+
+  function rowNormal(u) {
+    const dot   = `<span class="online-dot ${u.online ? 'on' : 'off'}"></span>`;
+    const role  = `<span class="role-badge role-${u.role}">${u.role === 'teacher' ? 'PROFESSOR' : 'ALUNO'}</span>`;
+    return `
+      <tr id="row-${u.id}">
+        <td>${dot}</td>
+        <td class="td-username">${esc(u.username)}</td>
+        <td class="td-name">${esc(u.name)}</td>
+        <td>${role}</td>
+        <td class="td-date">${fmtDate(u.created_at)}</td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-icon" onclick="startEdit('${u.id}')">editar</button>
+            <button class="btn-icon danger" onclick="deleteUser('${u.id}','${esc(u.username)}')">remover</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function rowEdit(u) {
+    return `
+      <tr id="row-${u.id}" class="editing">
+        <td></td>
+        <td class="td-username">${esc(u.username)}</td>
+        <td><input class="inline-input" id="edit-name" value="${esc(u.name)}" placeholder="Nome" /></td>
+        <td>
+          <select class="inline-select" id="edit-role">
+            <option value="student" ${u.role==='student'?'selected':''}>Aluno</option>
+            <option value="teacher" ${u.role==='teacher'?'selected':''}>Professor</option>
+          </select>
+        </td>
+        <td><input class="inline-input" id="edit-password" placeholder="nova senha (opcional)" /></td>
+        <td>
+          <div class="row-actions">
+            <button class="btn-icon confirm" onclick="saveEdit('${u.id}')">salvar</button>
+            <button class="btn-icon cancel"  onclick="cancelEdit()">cancelar</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  // ── edição inline ────────────────────────────────────────────────────────────
+
+  function startEdit(id) {
+    editingId = id;
+    renderTable();
+    document.getElementById('edit-name')?.focus();
+  }
+
+  function cancelEdit() {
+    editingId = null;
+    renderTable();
+  }
+
+  async function saveEdit(id) {
+    const name     = document.getElementById('edit-name').value.trim();
+    const role     = document.getElementById('edit-role').value;
+    const password = document.getElementById('edit-password').value;
+
+    if (!name) { toast('Nome não pode estar vazio.', 'err'); return; }
+
+    const body = { name, role };
+    if (password) body.password = password;
+
+    try {
+      await apiFetch(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      editingId = null;
+      toast('Usuário atualizado.', 'ok');
+      await loadUsers();
+    } catch (e) {
+      toast(e.message, 'err');
+    }
+  }
+
+  // ── remover usuário ───────────────────────────────────────────────────────────
+
+  async function deleteUser(id, username) {
+    if (!confirm(`Remover "${username}" e todos os projetos dele?\n\nEssa ação não pode ser desfeita.`)) return;
+    try {
+      await apiFetch(`/users/${id}`, { method: 'DELETE' });
+      toast(`"${username}" removido.`, 'ok');
+      await loadUsers();
+    } catch (e) {
+      toast(e.message, 'err');
+    }
+  }
+
+  // ── criar usuário ─────────────────────────────────────────────────────────────
+
+  async function createUser() {
+    const username = document.getElementById('f-username').value.trim();
+    const name     = document.getElementById('f-name').value.trim();
+    const password = document.getElementById('f-password').value;
+    const role     = document.getElementById('f-role').value;
+
+    if (!username) { toast('Username obrigatório.', 'err'); return; }
+    if (!name)     { toast('Nome obrigatório.', 'err'); return; }
+    if (!password || password.length < 4) { toast('Senha deve ter ao menos 4 caracteres.', 'err'); return; }
+
+    const btn = document.getElementById('create-btn');
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+      await apiFetch('/users', {
+        method: 'POST',
+        body: JSON.stringify({ username, name, password, role }),
+      });
+      document.getElementById('f-username').value = '';
+      document.getElementById('f-name').value     = '';
+      document.getElementById('f-password').value = '';
+      toast(`"${username}" criado com sucesso.`, 'ok');
+      await loadUsers();
+    } catch (e) {
+      toast(e.message, 'err');
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = '+ CRIAR USUÁRIO';
+    }
+  }
+
+  // ── enter no form ─────────────────────────────────────────────────────────────
+
+  ['f-username','f-name','f-password','f-role'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') createUser();
+    });
+  });
+
+  // ── toast ─────────────────────────────────────────────────────────────────────
+
+  function toast(msg, type = 'ok') {
+    const icon = type === 'ok' ? '✓' : '✕';
+    const el   = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span class="ti">${icon}</span>${msg}`;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── utils ─────────────────────────────────────────────────────────────────────
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ── init ──────────────────────────────────────────────────────────────────────
+
+  loadUsers();
+  setInterval(loadUsers, 10_000); // atualiza a cada 10s
+</script>
+</body>
+</html>

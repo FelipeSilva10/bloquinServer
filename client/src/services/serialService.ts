@@ -3,13 +3,15 @@
  *
  * Abstração sobre Web Serial API + esptool-js v0.6.
  *
- * API verificada contra node_modules/esptool-js/lib/esploader.d.ts:
- *   - loader.main()            → Promise<string> (retorna nome do chip)
- *   - loader.writeFlash(opts)  → Promise<void>   (opts.fileArray[].data é Uint8Array)
- *   - loader.after(mode)       → Promise<void>   (mode: 'hard_reset' | 'soft_reset' | …)
- *   - Transport(device)        → constructor recebe SerialPort diretamente
+ * FIX Chromebook: Todos os pontos de entrada agora verificam
+ * se navigator.serial existe antes de prosseguir, com mensagens
+ * de erro claras e específicas para cada situação.
  *
- * Tipos SerialPort definidos em src/types/web-serial.d.ts.
+ * Notas sobre disponibilidade da Web Serial API:
+ *   - Chrome/Edge 89+ em HTTPS ou localhost: disponível
+ *   - Chromebooks com Chrome OS: disponível (Chrome ≥ 89)
+ *   - Chrome com flag desabilitada via policy: indisponível
+ *   - Firefox, Safari: indisponível
  */
 
 import { ESPLoader, Transport } from 'esptool-js';
@@ -26,6 +28,25 @@ export interface FlashProgress {
 export type FlashLogFn      = (line: string) => void;
 export type FlashProgressFn = (p: FlashProgress) => void;
 
+// ── Verificação de suporte ────────────────────────────────────────────────────
+
+export function isWebSerialSupported(): boolean {
+  return typeof navigator !== 'undefined' && 'serial' in navigator && navigator.serial !== undefined;
+}
+
+function assertWebSerial(): void {
+  if (!isWebSerialSupported()) {
+    throw new Error(
+      'Web Serial API não disponível.\n\n' +
+      'Para usar a gravação direta no Chromebook:\n' +
+      '1. Certifique-se de usar Chrome 89+ ou Edge 89+\n' +
+      '2. Acesse via http:// (não https://)\n' +
+      '3. Se o erro persistir, ative: chrome://flags/#enable-experimental-web-platform-features\n\n' +
+      'Alternativa: use o app desktop Bloquin para gravar.'
+    );
+  }
+}
+
 // ── Estado interno do monitor serial ─────────────────────────────────────────
 
 let monitorPort:   SerialPort | null = null;
@@ -36,48 +57,48 @@ let monitorActive  = false;
 
 /**
  * Grava um binário no ESP32 via Web Serial + esptool-js.
- *
- * Fluxo (conforme PDD):
- *  1. requestPort() — o browser exibe o seletor de porta
- *  2. Transport(port) — wrap esptool-js sobre a porta
- *  3. ESPLoader.main() — handshake ROM, retorna nome do chip
- *  4. ESPLoader.writeFlash() — grava o .bin em 0x10000 com compressão + MD5
- *  5. ESPLoader.after('hard_reset') — reinicia o ESP32
- *  6. transport.disconnect() — fecha a porta
  */
 export async function flashESP32(
   firmware:    ArrayBuffer,
   onLog:       FlashLogFn,
   onProgress:  FlashProgressFn,
 ): Promise<void> {
+  // FIX Chromebook: verificar suporte antes de qualquer operação
+  assertWebSerial();
 
-  // 1. Solicitar porta ao usuário (requer gesto — deve ser chamado em handler de clique)
+  // 1. Solicitar porta ao usuário
   let port: SerialPort;
   try {
     port = await navigator.serial.requestPort({ filters: [] });
   } catch (err: unknown) {
-    if (err instanceof Error && err.name === 'NotAllowedError') {
-      throw new Error('Porta não selecionada. Selecione a porta do ESP32 para continuar.');
+    if (err instanceof Error) {
+      if (err.name === 'NotAllowedError') {
+        throw new Error('Porta não selecionada. Selecione a porta do ESP32 para continuar.');
+      }
+      if (err.name === 'SecurityError') {
+        throw new Error(
+          'Acesso à porta serial bloqueado pela política do sistema.\n' +
+          'Contate o professor ou use o app desktop Bloquin.'
+        );
+      }
     }
     throw err;
   }
 
-  // Terminal que redireciona os logs internos do esptool-js para nosso callback
+  // Terminal que redireciona logs do esptool-js
   const terminal = {
     clean:     () => {},
     writeLine: (data: string) => onLog(data),
     write:     (data: string) => { if (data.trim()) onLog(data.trim()); },
   };
 
-  // 2. Criar Transport (recebe SerialPort diretamente — sem Transport.connect manual)
   const transport = new Transport(port);
 
   try {
-    // 3. Conectar ao ESP32 — ESPLoader controla DTR/RTS para modo de gravação
     onLog('Conectando ao ESP32…');
     const loader = new ESPLoader({
       transport,
-      baudrate: 115200,    // esptool-js negocia subida para 921600 internamente
+      baudrate: 115200,
       terminal,
       debugLogging: false,
     });
@@ -85,10 +106,6 @@ export async function flashESP32(
     const chipName = await loader.main();
     onLog(`Chip: ${chipName}`);
 
-    // 4. Gravar o binário
-    //    - data: Uint8Array (não string — verificado em FlashOptions.fileArray[].data)
-    //    - address: 0x10000 = app binary para ESP32 (arduino-cli gera .ino.bin para este offset)
-    //    - calculateMD5Hash: recebe Uint8Array — usar CryptoJS.lib.WordArray.create()
     onLog('Gravando firmware…');
     const firmwareBytes = new Uint8Array(firmware);
 
@@ -109,13 +126,11 @@ export async function flashESP32(
       },
     });
 
-    // 5. Reset após gravação
     onLog('Reiniciando ESP32…');
     await loader.after('hard_reset');
     onLog('Gravação concluída!');
 
   } finally {
-    // 6. Sempre desconectar a porta, mesmo em caso de erro
     try { await transport.disconnect(); } catch { /* porta já fechada */ }
   }
 }
@@ -124,23 +139,32 @@ export async function flashESP32(
 
 /**
  * Abre porta serial e emite linhas via callback.
- * Para o monitor anterior se já estiver ativo.
  */
 export async function startMonitor(
   baudRate:  number,
   onMessage: (line: string) => void,
 ): Promise<void> {
-  // Para qualquer monitor anterior
+  // FIX Chromebook: verificar suporte antes de qualquer operação
+  assertWebSerial();
+
   await stopMonitor();
 
-  // requestPort — requer gesto do usuário
-  monitorPort = await navigator.serial.requestPort({ filters: [] });
-  await monitorPort.open({ baudRate });
+  let port: SerialPort;
+  try {
+    port = await navigator.serial.requestPort({ filters: [] });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'NotAllowedError') {
+      throw new Error('Porta não selecionada. Selecione a porta do ESP32 para monitorar.');
+    }
+    throw err;
+  }
 
+  await port.open({ baudRate });
+
+  monitorPort   = port;
   monitorActive = true;
-  monitorReader = monitorPort.readable!.getReader();
+  monitorReader = port.readable!.getReader();
 
-  // Loop de leitura em background — não bloqueia
   _readLoop(monitorReader, onMessage).catch(() => {
     // Porta fechada normalmente pelo stopMonitor()
   });
@@ -152,9 +176,9 @@ export async function startMonitor(
 export async function stopMonitor(): Promise<void> {
   monitorActive = false;
 
-  try { await monitorReader?.cancel(); }    catch { /* ignora */ }
-  try { monitorReader?.releaseLock(); }      catch { /* ignora */ }
-  try { await monitorPort?.close(); }        catch { /* ignora */ }
+  try { await monitorReader?.cancel(); }   catch { /* ignora */ }
+  try { monitorReader?.releaseLock(); }    catch { /* ignora */ }
+  try { await monitorPort?.close(); }      catch { /* ignora */ }
 
   monitorReader = null;
   monitorPort   = null;
@@ -175,7 +199,6 @@ async function _readLoop(
 
     buffer += decoder.decode(value, { stream: true });
 
-    // Emite linhas completas (terminadas em \n)
     let idx: number;
     while ((idx = buffer.indexOf('\n')) !== -1) {
       const line = buffer.slice(0, idx).replace(/\r$/, '').trim();
@@ -183,7 +206,6 @@ async function _readLoop(
       if (line) onMessage(line);
     }
 
-    // Segurança: descarta buffer sem newline se crescer demais (lixo de boot)
     if (buffer.length > 4000) buffer = '';
   }
 }

@@ -1,31 +1,27 @@
 /**
  * hardwareService.ts
  *
- * FIX #8: uploadCode agora retorna Promise<string> com o jobId,
- * eliminando a dependência de sessionStorage.getItem('blq_last_job')
- * no FlashModal (que causava jobId stale após compilações consecutivas).
+ * FIX Chromebook: usa isWebSerialSupported() de serialService
+ * para dar feedback correto sobre disponibilidade de Web Serial.
  */
 
 import { getToken } from './api';
 import { blqWs, type WsEvent } from './wsClient';
-import { startMonitor, stopMonitor } from './serialService';
+import { startMonitor, stopMonitor, isWebSerialSupported } from './serialService';
 
 export type UnlistenFn = () => void;
 
 export const HardwareService = {
 
   async getAvailablePorts(): Promise<string[]> {
-    if (!('serial' in navigator)) {
-      return ['(Web Serial indisponível neste navegador)'];
+    if (!isWebSerialSupported()) {
+      return ['(Web Serial indisponível — use o app desktop)'];
     }
     return ['(ESP32 — clique Compilar, depois Gravar)'];
   },
 
   /**
-   * FIX #8: retorna o jobId em vez de armazená-lo no sessionStorage.
-   * O chamador (IdeScreen) mantém o jobId em estado React e passa ao FlashModal.
-   *
-   * @returns Promise<string> jobId da compilação enfileirada
+   * Enfileira compilação e retorna jobId.
    */
   async uploadCode(codigo: string, _placa: string, _porta: string): Promise<string> {
     const token = getToken();
@@ -47,7 +43,6 @@ export const HardwareService = {
 
     const { jobId } = await res.json() as { jobId: string; position: number };
 
-    // FIX #8: jobId retornado — não salvar mais em sessionStorage
     blqWs.onJob(jobId, (event: WsEvent) => {
       switch (event.type) {
         case 'done':
@@ -73,8 +68,13 @@ export const HardwareService = {
   },
 
   async startSerial(_porta: string): Promise<void> {
-    if (!('serial' in navigator)) {
-      throw new Error('Web Serial API não disponível. Use Chrome 89+ ou Edge 89+.');
+    // FIX Chromebook: erro claro em vez de crash
+    if (!isWebSerialSupported()) {
+      throw new Error(
+        'Web Serial API não disponível neste dispositivo.\n' +
+        'No Chromebook: ative em chrome://flags/#enable-experimental-web-platform-features\n' +
+        'Ou use o app desktop Bloquin para monitorar a serial.'
+      );
     }
     await startMonitor(115200, (line: string) => {
       window.dispatchEvent(new CustomEvent('blq:serial-message', { detail: line }));
